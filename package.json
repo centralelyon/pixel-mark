@@ -1,0 +1,23 @@
+{
+  "name": "pixel_mark",
+  "version": "0.1.0",
+  "description": "Standalone build of the pixel-mark d3-toolkit (extracted from the @liris/pixel-mark-d3-toolkit Observable notebook).",
+  "type": "module",
+  "main": "dist/pixel_mark.umd.js",
+  "module": "dist/pixel_mark.esm.js",
+  "unpkg": "dist/pixel_mark.umd.js",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "rollup -c"
+  },
+  "peerDependencies": {
+    "d3": "^7.9.0"
+  },
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "rollup": "^4.24.0"
+  }
+}

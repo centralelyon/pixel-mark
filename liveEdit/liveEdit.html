@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <title>pixel-mark example</title>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+    <script src="../dist/pixel_mark.umd.js"></script>
+    <script src="./main.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body style="min-width: 1200px">
+<div style="margin: 0 auto; display: flex; justify-content: space-around;">
+    <div>
+        <h2>Visualization</h2>
+        <svg style="margin: 50px;border: #333 1px solid" width="700" height="500" viewBox="0 0 800 600" id="main">
+
+        </svg>
+    </div>
+    <div id="editor">
+        <h2>Live Code</h2>
+
+        <textarea id="code">
+svg
+    .selectAll("dot")
+    .data(dataset)
+    .enter()
+    .append("image")
+    .attr("x", (d) => xScale(d["First Inauguration Date"]))
+    .attr("y", (d) =>
+        yScale(
+            d["Very Favorable %"] +
+            d["Somewhat Favorable %"] -
+            d["Very Unfavorable %"] -
+            d["Somewhat Unfavorable %"]
+        )
+    )
+    .attr("width", 40)
+    .fit("clip")
+    .shape("circle")
+        </textarea>
+
+        <div id="error"></div>
+    </div>
+</div>
+</body>
+</html>

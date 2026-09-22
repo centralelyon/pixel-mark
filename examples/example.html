@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <title>pixel-mark example</title>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+    <script src="../dist/pixel_mark.umd.js"></script>
+    <script type="text/javascript">
+        const {initPixScale, fit, shape, transform} = pixel_mark;
+
+        // import {initPixScale} from "../src/index.js";
+        const width = 800;
+        const height = 600;
+        const margin = 30
+        d3.csv("./presidents.csv", d3.autoType).then(async (data) => {
+            console.log(data);
+
+            let images = data.map(d => d["Portrait URL"])
+
+
+            const dataset = await initPixScale(data, images)
+
+            const svg = d3.select("#main");
+
+
+            let domain = d3.extent(data.map(d => d["Very Favorable %"] + d["Somewhat Favorable %"] - d["Very Unfavorable %"] - d["Somewhat Unfavorable %"]))
+            let time = data.map(d => d["First Inauguration Date"])
+            console.log(time);
+            const xScale = d3.scaleTime([time[0], time[time.length - 1]], [margin, width - margin * 2])
+            const yScale = d3.scaleLinear(domain, [height - margin * 2, margin])
+
+            console.log(dataset);
+
+            svg
+                .selectAll("dot")
+                .data(dataset)
+                .enter()
+                .append("image")
+                .attr("x", (d) => xScale(d["First Inauguration Date"]))
+                .attr("y", (d) => yScale(d["Very Favorable %"] + d["Somewhat Favorable %"] - d["Very Unfavorable %"] - d["Somewhat Unfavorable %"]))
+                .attr("width", 40)
+                .shape("circle")
+
+
+            const gx = svg.append("g")
+                .attr("transform", `translate(${margin},${height - margin})`)
+                .call(d3.axisBottom(xScale));
+
+            const gy = svg.append("g")
+                .attr("transform", `translate(${margin},0)`)
+                .call(d3.axisLeft(yScale));
+
+        });
+
+
+    </script>
+</head>
+<body>
+
+<svg style="margin: 50px;border: #333 1px solid" width="800" height="600" viewBox="0 0 800 600" id="main">
+
+</svg>
+
+
+</body>
+</html>
