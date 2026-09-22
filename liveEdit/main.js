@@ -39,7 +39,6 @@ d3.csv("./presidents.csv", d3.autoType).then(async (data) => {
     );
 
 
-
     const marks = svg
         .append("g")
         .attr("class", "marks");
@@ -55,30 +54,18 @@ d3.csv("./presidents.csv", d3.autoType).then(async (data) => {
         .call(d3.axisLeft(yScale));
 
 
-    // ------------------------------------------------
-    // Live editor
-    // ------------------------------------------------
-
     const editor = document.querySelector("#code");
     const error = document.querySelector("#error");
 
 
     function runCode() {
 
-        // Remove only the marks.
-        // The axes remain untouched.
         marks.selectAll("*").remove();
 
         error.textContent = "";
 
         try {
 
-            /*
-             * The important trick:
-             *
-             * The user's code thinks "svg" is the SVG
-             * selection, but we give it the marks group.
-             */
             const code = editor.value;
 
             const run = new Function(
@@ -109,12 +96,8 @@ d3.csv("./presidents.csv", d3.autoType).then(async (data) => {
         }
     }
 
-
-    // Run initially
     runCode();
 
-
-    // Run whenever the code changes
     let timeout;
 
     editor.addEventListener("input", () => {
