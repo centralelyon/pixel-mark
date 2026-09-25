@@ -13,18 +13,26 @@ d3.csv("./presidents.csv", d3.autoType).then(async (data) => {
 
     const images = data.map(d => d["Portrait URL"]);
 
-    const dataset = await initPixScale(data, images);
+    let dataset = await initPixScale(data, images);
 
     const svg = d3.select("#main");
 
+    dataset = dataset.map(d => {
+            d["opinion"] = d["Very Favorable %"] +
+                d["Somewhat Favorable %"] -
+                d["Very Unfavorable %"] -
+                d["Somewhat Unfavorable %"]
+            ;
+
+            return d
+        }
+    )
+
+
     const domain = d3.extent(
-        data.map(d =>
-            d["Very Favorable %"] +
-            d["Somewhat Favorable %"] -
-            d["Very Unfavorable %"] -
-            d["Somewhat Unfavorable %"]
-        )
+        data.map(d => d.opinion)
     );
+
 
     const time = data.map(d => d["First Inauguration Date"]);
 

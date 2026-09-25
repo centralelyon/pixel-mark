@@ -30,6 +30,7 @@
         <h3>Live Edit</h3>
 
         <textarea id="code">
+
 svg
     .selectAll("dot")
     .data(dataset)
@@ -38,17 +39,14 @@ svg
     .attr("x", d =>
         xScale(d["First Inauguration Date"])
     )
-    .attr("y", d =>
-        yScale(
-            d["Very Favorable %"] +
-            d["Somewhat Favorable %"] -
-            d["Very Unfavorable %"] -
-            d["Somewhat Unfavorable %"]
-        )
-    )
+    .attr("y", d => yScale(d.opinion))
     .attr("width", 40)
-    .fit("clip")
+    .fit("saliencyCrop")
     .shape("hexagon")
+    .transform("hexbin",0.5)
+
+
+
         </textarea>
 
         <div id="error"></div>
