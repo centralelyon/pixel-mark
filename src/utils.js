@@ -55,3 +55,10 @@ export async function loadImage(url) {
 
     return image;
 }
+
+export function attachImage(datum, img) {
+    datum.__img = img;
+    datum.__canvas = createCanvas(img.naturalWidth, img.naturalHeight);
+    datum.__canvas.getContext("2d").drawImage(img, 0, 0);
+    return datum;
+}

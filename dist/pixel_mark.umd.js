@@ -81,25 +81,46 @@
         return image;
     }
 
+    function attachImage(datum, img) {
+        datum.__img = img;
+        datum.__canvas = createCanvas(img.naturalWidth, img.naturalHeight);
+        datum.__canvas.getContext("2d").drawImage(img, 0, 0);
+        return datum;
+    }
+
     function datumFor(element, data) {
         return element.__data__;
     }
 
     const transforms = {
-        pixel: { defaultRange: [], function: pixelate },
-        kcolor: { defaultRange: [1, 10], function: setKcolor },
-        blur: { defaultRange: [2, 0], function: blur },
-        opacity: { defaultRange: [0, 1], function: opacity },
-        sepia: { defaultRange: [1, 0], function: sepia },
-        invert: { defaultRange: [1, 0.1], function: invert },
-        saturate: { defaultRange: [0, 3], function: saturate },
-        brightness: { defaultRange: [0.1, 2], function: brightness },
-        contrast: { defaultRange: [0.15, 3], function: contrast },
-        grayscale: { defaultRange: [1, 0], function: grayscale },
-        dotted: { defaultRange: [0.025, 0.25], function: dotted },
-        grid: { defaultRange: [0.025, 0.25], function: grid },
-        countSq: { defaultRange: [0, 1], function: countSq },
-        toColor: { defaultRange: [], function: transform_toColor }
+        pixel: {defaultRange: [], function: pixelate},
+        kcolor: {defaultRange: [1, 10], function: setKcolor},
+        blur: {defaultRange: [2, 0], function: blur},
+        opacity: {defaultRange: [0, 1], function: opacity},
+        sepia: {defaultRange: [1, 0], function: sepia},
+        invert: {defaultRange: [1, 0.1], function: invert},
+        saturate: {defaultRange: [0, 3], function: saturate},
+        brightness: {defaultRange: [0.1, 2], function: brightness},
+        contrast: {defaultRange: [0.15, 3], function: contrast},
+        grayscale: {defaultRange: [1, 0], function: grayscale},
+        dotted: {defaultRange: [0.025, 0.25], function: dotted},
+        grid: {defaultRange: [0.025, 0.25], function: grid},
+        countSq: {defaultRange: [0, 1], function: countSq},
+        toColor: {defaultRange: [], function: transform_toColor},
+        spiral: {defaultRange: [0, 1], function: spiral},
+        radial: {defaultRange: [0, 1], function: radial},
+        orbit: {defaultRange: [0, 1], function: orbit},
+        wave: {defaultRange: [0, 1], function: wave},
+        flow: {defaultRange: [0, 1], function: flow},
+        hexbin: {defaultRange: [0, 1], function: hexbin},
+        halftone: {defaultRange: [0, 1], function: halftone},
+        edge: {defaultRange: [0, 1], function: edge},
+        flowField: {defaultRange: [0, 1], function: flowField},
+        shear: {defaultRange: [0, 1], function: shear},
+        warp: {defaultRange: [0, 1], function: warp},
+        fisheye: {defaultRange: [0, 1], function: fisheye},
+        ripple: {defaultRange: [0, 1], function: ripple},
+        twist: {defaultRange: [0, 1], function: twist}
     };
 
     function transform(elements, type, callback, dataCallback, custom) {
@@ -119,7 +140,7 @@
             } else if (transforms[type]) {
                 d.__canvas = transforms[type].function(d.__canvas, value);
             } else {
-                throw new Error(`Unknown transform: ${type}`);
+                throw new Error(`Unknown transform: "${type}". Valid transforms: ${Object.keys(transforms).join(", ")}, custom`);
             }
 
             setImageHref(element, d.__canvas.toDataURL(IMAGE_MIME));
@@ -344,7 +365,7 @@
             if (moved) assign(centroids, points);
         }
 
-        return { centroids, iterations };
+        return {centroids, iterations};
     }
 
     function getMatrix(imageData) {
@@ -363,7 +384,7 @@
                     b: imageData.data[i + 2],
                     a: imageData.data[i + 3]
                 },
-                position: { x, y }
+                position: {x, y}
             });
 
             if (x >= result.width - 1) {
@@ -503,6 +524,355 @@
         return canvas;
     }
 
+    function normalizedValue$1(value) {
+        if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+        return Math.max(0, Math.min(1, value));
+    }
+
+    function sourceImage(canvas) {
+        const source = createCanvas(canvas.width, canvas.height);
+        source.getContext("2d").drawImage(canvas, 0, 0);
+        return source;
+    }
+
+    function putPixels(canvas, pixels) {
+        canvas.getContext("2d").putImageData(pixels, 0, 0);
+        return canvas;
+    }
+
+    function sampleBilinear(data, width, height, x, y) {
+        x = Math.max(0, Math.min(width - 1, x));
+        y = Math.max(0, Math.min(height - 1, y));
+
+        const x0 = Math.floor(x);
+        const y0 = Math.floor(y);
+        const x1 = Math.min(width - 1, x0 + 1);
+        const y1 = Math.min(height - 1, y0 + 1);
+        const fx = x - x0;
+        const fy = y - y0;
+
+        const i00 = (y0 * width + x0) * 4;
+        const i10 = (y0 * width + x1) * 4;
+        const i01 = (y1 * width + x0) * 4;
+        const i11 = (y1 * width + x1) * 4;
+        const out = [0, 0, 0, 0];
+
+        for (let c = 0; c < 4; c++) {
+            const a = data[i00 + c] * (1 - fx) + data[i10 + c] * fx;
+            const b = data[i01 + c] * (1 - fx) + data[i11 + c] * fx;
+            out[c] = a * (1 - fy) + b * fy;
+        }
+        return out;
+    }
+
+    function remapPixels(canvas, mapper) {
+        const context = canvas.getContext("2d");
+        const width = canvas.width;
+        const height = canvas.height;
+        const source = sourceImage(canvas);
+        const input = source.getContext("2d").getImageData(0, 0, width, height);
+        const output = context.createImageData(width, height);
+        const src = input.data;
+        const dst = output.data;
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const mapped = mapper(x, y, width, height);
+                const pixel = sampleBilinear(src, width, height, mapped[0], mapped[1]);
+                const i = (y * width + x) * 4;
+                dst[i] = pixel[0];
+                dst[i + 1] = pixel[1];
+                dst[i + 2] = pixel[2];
+                dst[i + 3] = pixel[3];
+            }
+        }
+        return putPixels(canvas, output);
+    }
+
+
+    function spiral(canvas, value) {
+        const n = normalizedValue$1(value);
+        const turns = n * 3 * Math.PI;
+        const maxRadius = Math.hypot(canvas.width, canvas.height) / 2;
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        return remapPixels(canvas, (x, y) => {
+            const dx = x - cx;
+            const dy = y - cy;
+            const radius = Math.hypot(dx, dy);
+            const angle = Math.atan2(dy, dx) + turns * (radius / maxRadius);
+            return [cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)];
+        });
+    }
+
+    function radial(canvas, value) {
+        const n = normalizedValue$1(value);
+        const strength = n * 0.9;
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        const maxRadius = Math.hypot(cx, cy);
+        return remapPixels(canvas, (x, y) => {
+            const dx = x - cx;
+            const dy = y - cy;
+            const r = Math.hypot(dx, dy);
+            if (!r) return [x, y];
+            const factor = 1 + strength * (r / maxRadius) ** 2;
+            return [cx + dx * factor, cy + dy * factor];
+        });
+    }
+
+    function orbit(canvas, value) {
+        const n = normalizedValue$1(value);
+        const angle = n * Math.PI * 2;
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        return remapPixels(canvas, (x, y) => {
+            const dx = x - cx;
+            const dy = y - cy;
+            return [cx + dx * cos + dy * sin, cy - dx * sin + dy * cos];
+        });
+    }
+
+    function wave(canvas, value) {
+        const n = normalizedValue$1(value);
+        const amplitude = n * Math.min(canvas.width, canvas.height) * 0.18;
+        const cycles = 1 + n * 7;
+        return remapPixels(canvas, (x, y, width, height) => [
+            x,
+            y + Math.sin((x / width) * Math.PI * 2 * cycles) * amplitude
+        ]);
+    }
+
+    function flow(canvas, value) {
+        const n = normalizedValue$1(value);
+        const amount = n * Math.min(canvas.width, canvas.height) * 0.25;
+        return remapPixels(canvas, (x, y, width, height) => {
+            const nx = x / width;
+            const ny = y / height;
+            return [
+                x + Math.sin(ny * Math.PI * 4 + nx * 2) * amount,
+                y + Math.cos(nx * Math.PI * 4 + ny * 2) * amount
+            ];
+        });
+    }
+
+
+    function hexbin(canvas, value) {
+        const n = normalizedValue$1(value);
+        const minSize = 2;
+        const maxSize = Math.max(3, Math.min(canvas.width, canvas.height) / 8);
+        const radius = minSize + n * (maxSize - minSize);
+        const context = canvas.getContext("2d");
+        const source = sourceImage(canvas);
+        const output = createCanvas(canvas.width, canvas.height);
+        const out = output.getContext("2d");
+        out.clearRect(0, 0, output.width, output.height);
+
+        const dx = radius * Math.sqrt(3);
+        const dy = radius * 1.5;
+        for (let row = 0, y = radius; y < canvas.height + radius; row++, y += dy) {
+            const offset = row % 2 ? dx / 2 : 0;
+            for (let x = radius + offset; x < canvas.width + radius; x += dx) {
+                const sx = Math.max(0, Math.min(canvas.width - 1, Math.round(x)));
+                const sy = Math.max(0, Math.min(canvas.height - 1, Math.round(y)));
+                const pixel = source.getContext("2d").getImageData(sx, sy, 1, 1).data;
+                out.fillStyle = `rgba(${pixel[0]},${pixel[1]},${pixel[2]},${pixel[3] / 255})`;
+                out.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const a = Math.PI / 3 * i;
+                    const px = x + radius * Math.cos(a);
+                    const py = y + radius * Math.sin(a);
+                    if (i === 0) out.moveTo(px, py); else out.lineTo(px, py);
+                }
+                out.closePath();
+                out.fill();
+            }
+        }
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(output, 0, 0);
+        return canvas;
+    }
+
+
+    function halftone(canvas, value) {
+        const n = normalizedValue$1(value);
+        const minRadius = 0.75;
+        const maxCell = Math.max(3, Math.min(canvas.width, canvas.height) / 14);
+        const cell = minRadius + n * (maxCell - minRadius);
+        const source = sourceImage(canvas);
+        const input = source.getContext("2d");
+        const context = canvas.getContext("2d");
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.fillStyle = "white";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+
+        for (let y = cell / 2; y < canvas.height; y += cell) {
+            for (let x = cell / 2; x < canvas.width; x += cell) {
+                const sx = Math.min(canvas.width - 1, Math.floor(x));
+                const sy = Math.min(canvas.height - 1, Math.floor(y));
+                const p = input.getImageData(sx, sy, 1, 1).data;
+                const luminance = (0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]) / 255;
+                const radius = (1 - luminance) * cell * 0.48;
+                if (radius <= 0) continue;
+                context.fillStyle = `rgba(${p[0]},${p[1]},${p[2]},${p[3] / 255})`;
+                context.beginPath();
+                context.arc(x, y, radius, 0, Math.PI * 2);
+                context.fill();
+            }
+        }
+        return canvas;
+    }
+
+    function edge(canvas, value) {
+        const n = normalizedValue$1(value);
+        const source = sourceImage(canvas);
+        const context = source.getContext("2d");
+        const input = context.getImageData(0, 0, canvas.width, canvas.height);
+        const output = context.createImageData(canvas.width, canvas.height);
+        const src = input.data;
+        const dst = output.data;
+        const threshold = n * 255;
+
+        const luminance = (x, y) => {
+            x = Math.max(0, Math.min(canvas.width - 1, x));
+            y = Math.max(0, Math.min(canvas.height - 1, y));
+            const i = (y * canvas.width + x) * 4;
+            return 0.2126 * src[i] + 0.7152 * src[i + 1] + 0.0722 * src[i + 2];
+        };
+
+        for (let y = 0; y < canvas.height; y++) {
+            for (let x = 0; x < canvas.width; x++) {
+                const gx = -luminance(x - 1, y - 1) - 2 * luminance(x - 1, y) - luminance(x - 1, y + 1)
+                    + luminance(x + 1, y - 1) + 2 * luminance(x + 1, y) + luminance(x + 1, y + 1);
+                const gy = -luminance(x - 1, y - 1) - 2 * luminance(x, y - 1) - luminance(x + 1, y - 1)
+                    + luminance(x - 1, y + 1) + 2 * luminance(x, y + 1) + luminance(x + 1, y + 1);
+                const magnitude = Math.min(255, Math.hypot(gx, gy));
+                const v = magnitude >= threshold ? magnitude : magnitude * n;
+                const i = (y * canvas.width + x) * 4;
+                dst[i] = dst[i + 1] = dst[i + 2] = v;
+                dst[i + 3] = 255;
+            }
+        }
+        return putPixels(canvas, output);
+    }
+
+    function flowField(canvas, value) {
+        const n = normalizedValue$1(value);
+        const source = sourceImage(canvas);
+        const input = source.getContext("2d").getImageData(0, 0, canvas.width, canvas.height);
+        const data = input.data;
+        const width = canvas.width;
+        const height = canvas.height;
+        const step = 1 + n * 7;
+        const strength = n * Math.min(width, height) * 0.18;
+        return remapPixels(canvas, (x, y) => {
+            const xi = Math.max(1, Math.min(width - 2, Math.round(x)));
+            const yi = Math.max(1, Math.min(height - 2, Math.round(y)));
+            const lum = (px, py) => {
+                const i = (py * width + px) * 4;
+                return 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+            };
+            const dx = lum(xi + 1, yi) - lum(xi - 1, yi);
+            const dy = lum(xi, yi + 1) - lum(xi, yi - 1);
+            const len = Math.hypot(dx, dy) || 1;
+            return [x - (dy / len) * strength * step / 4, y + (dx / len) * strength * step / 4];
+        });
+    }
+
+    function shear(canvas, value) {
+        const n = normalizedValue$1(value);
+        const amount = (n - 0.5) * 2;
+        const maxShear = 0.8;
+        return drawWithTransform(canvas, (context, source, width, height) => {
+            context.transform(1, 0, amount * maxShear, 1, -amount * maxShear * height / 2, 0);
+            context.drawImage(source, 0, 0);
+        });
+    }
+
+    function warp(canvas, value) {
+        const n = normalizedValue$1(value);
+        const strength = n * 0.9;
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        return remapPixels(canvas, (x, y) => {
+            const nx = (x - cx) / cx;
+            const ny = (y - cy) / cy;
+            const radial = nx * nx + ny * ny;
+            const factor = 1 + strength * radial;
+            return [cx + (x - cx) / factor, cy + (y - cy) / factor];
+        });
+    }
+
+    function fisheye(canvas, value) {
+        const n = normalizedValue$1(value);
+        const strength = n;
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        const maxRadius = Math.hypot(cx, cy);
+        return remapPixels(canvas, (x, y) => {
+            const dx = x - cx;
+            const dy = y - cy;
+            const r = Math.hypot(dx, dy);
+            if (!r) return [x, y];
+            const rn = r / maxRadius;
+            const mapped = rn === 0 ? 0 : Math.tan(rn * Math.atan(1 + strength * 3)) / Math.tan(Math.atan(1 + strength * 3));
+            const factor = mapped / rn;
+            return [cx + dx * factor, cy + dy * factor];
+        });
+    }
+
+    function ripple(canvas, value) {
+        const n = normalizedValue$1(value);
+        const amplitude = n * Math.min(canvas.width, canvas.height) * 0.08;
+        const frequency = 4 + n * 16;
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        return remapPixels(canvas, (x, y) => {
+            const dx = x - cx;
+            const dy = y - cy;
+            const r = Math.hypot(dx, dy);
+            if (!r) return [x, y];
+            const offset = Math.sin(r / Math.max(1, Math.min(canvas.width, canvas.height)) * Math.PI * frequency) * amplitude;
+            return [x + dx / r * offset, y + dy / r * offset];
+        });
+    }
+
+    function twist(canvas, value) {
+        const n = normalizedValue$1(value);
+        const maxAngle = n * Math.PI * 2;
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        const maxRadius = Math.hypot(cx, cy);
+        return remapPixels(canvas, (x, y) => {
+            const dx = x - cx;
+            const dy = y - cy;
+            const r = Math.hypot(dx, dy);
+            const angle = maxAngle * (1 - Math.min(1, r / maxRadius));
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            return [cx + dx * cos - dy * sin, cy + dx * sin + dy * cos];
+        });
+    }
+
+    const fits = {
+        clip: {function: fit_clip},
+        stretch: {function: fit_stretch},
+        carve: {function: fit_carve},
+        repeat: {function: fit_repeat},
+        centerCrop: {defaultRange: [0, 1], function: fit_centerCrop},
+        focus: {defaultRange: [0, 1], function: fit_focus},
+        saliencyCrop: {defaultRange: [0, 1], function: fit_saliencyCrop},
+        warp: {defaultRange: [0, 1], function: fit_warp},
+        mesh: {defaultRange: [0, 1], function: fit_mesh},
+        squeeze: {defaultRange: [0, 1], function: fit_squeeze},
+        bend: {defaultRange: [0, 1], function: fit_bend},
+        cylinder: {defaultRange: [0, 1], function: fit_cylinder},
+        sphere: {defaultRange: [0, 1], function: fit_sphere},
+        spere: {defaultRange: [0, 1], function: fit_sphere}
+    };
+
     function fit(elements, type = "stretch", callback) {
         const elems = toElements(elements);
 
@@ -521,10 +891,11 @@
             d.__canvas.height = h;
 
             const strategy = fits[type];
-            if (!strategy) throw new Error(`Unknown fit: ${type}`);
+            if (!strategy) throw new Error(`Unknown fit: "${type}".  Valid fits: ${Object.keys(fits).join(", ")} `);
             strategy.function([w, h], d);
 
             setImageHref(element, d.__canvas.toDataURL(IMAGE_MIME));
+
         }
 
         return elements;
@@ -533,7 +904,10 @@
     function fit_repeat(containerSize, d) {
         const context = d.__canvas.getContext("2d");
         if (d.__clipath) context.clip(d.__clipath);
-        context.drawImage(d.__img, 0, 0, containerSize[0], containerSize[1]);
+
+        const pattern = context.createPattern(d.__img, "repeat");
+        context.fillStyle = pattern;
+        context.fillRect(0, 0, containerSize[0], containerSize[1]);
     }
 
     function fit_stretch(containerSize, d) {
@@ -864,18 +1238,417 @@
     }
 
 
-    const fits = {
-        clip: {function: fit_clip},
-        stretch: {function: fit_stretch},
-        carve: {function: fit_carve},
-        repeat: {function: fit_repeat}
-    };
+    function fitCanvasBase(containerSize, d) {
+        const context = d.__canvas.getContext("2d");
+        context.clearRect(0, 0, containerSize[0], containerSize[1]);
+        if (d.__clipath) context.clip(d.__clipath);
+        return context;
+    }
+
+    function normalizedFocus(d) {
+        const focus = Array.isArray(d.__focus) ? d.__focus : [0.5, 0.5];
+        return [
+            Math.max(0, Math.min(1, Number(focus[0]) || 0.5)),
+            Math.max(0, Math.min(1, Number(focus[1]) || 0.5))
+        ];
+    }
+
+    function coverScale(containerSize, image) {
+        return Math.max(
+            containerSize[0] / image.naturalWidth,
+            containerSize[1] / image.naturalHeight
+        );
+    }
+
+    function fitSourceScale(containerSize, image) {
+        return Math.min(
+            containerSize[0] / image.naturalWidth,
+            containerSize[1] / image.naturalHeight
+        );
+    }
+
+    function drawCentered(context, image, width, height, containerSize) {
+        const x = (containerSize[0] - width) / 2;
+        const y = (containerSize[1] - height) / 2;
+        context.drawImage(image, x, y, width, height);
+    }
+
+    function fit_centerCrop(containerSize, d, value = 1) {
+        const n = normalizedValue(value);
+        const context = fitCanvasBase(containerSize, d);
+        const contain = fitSourceScale(containerSize, d.__img);
+        const cover = coverScale(containerSize, d.__img);
+        const scale = contain + (cover - contain) * n;
+        drawCentered(context, d.__img,
+            d.__img.naturalWidth * scale,
+            d.__img.naturalHeight * scale,
+            containerSize);
+        return d.__canvas;
+    }
+
+    function fit_focus(containerSize, d, value = 1) {
+        const n = normalizedValue(value);
+        const context = fitCanvasBase(containerSize, d);
+        const focus = normalizedFocus(d);
+        // 0 is contain; 1 is a cover crop centered on the requested focal point.
+        const contain = fitSourceScale(containerSize, d.__img);
+        const cover = coverScale(containerSize, d.__img);
+        const scale = contain + (cover - contain) * n;
+        const sw = d.__img.naturalWidth * scale;
+        const sh = d.__img.naturalHeight * scale;
+        const maxX = Math.max(0, sw - containerSize[0]);
+        const maxY = Math.max(0, sh - containerSize[1]);
+        context.drawImage(d.__img, -maxX * focus[0], -maxY * focus[1], sw, sh);
+        return d.__canvas;
+    }
+
+    function saliencyPoint(image) {
+        const sampleW = Math.min(128, image.naturalWidth);
+        const sampleH = Math.max(1, Math.round(image.naturalHeight * sampleW / image.naturalWidth));
+        const sample = createCanvas(sampleW, sampleH);
+        const ctx = sample.getContext("2d", {willReadFrequently: true});
+        ctx.drawImage(image, 0, 0, sampleW, sampleH);
+        const pixels = ctx.getImageData(0, 0, sampleW, sampleH).data;
+        let total = 0, sx = 0, sy = 0;
+        const luminance = (x, y) => {
+            const i = (y * sampleW + x) * 4;
+            return 0.2126 * pixels[i] + 0.7152 * pixels[i + 1] + 0.0722 * pixels[i + 2];
+        };
+        for (let y = 1; y < sampleH - 1; ++y) {
+            for (let x = 1; x < sampleW - 1; ++x) {
+                const gx = Math.abs(luminance(x + 1, y) - luminance(x - 1, y));
+                const gy = Math.abs(luminance(x, y + 1) - luminance(x, y - 1));
+                const i = (y * sampleW + x) * 4;
+                const brightness = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / (3 * 255);
+                const weight = (gx + gy) * (0.35 + 0.65 * brightness);
+                total += weight;
+                sx += x * weight;
+                sy += y * weight;
+            }
+        }
+        if (!total) return [0.5, 0.5];
+        return [sx / total / Math.max(1, sampleW - 1), sy / total / Math.max(1, sampleH - 1)];
+    }
+
+    function fit_saliencyCrop(containerSize, d, value = 1) {
+        const n = normalizedValue(value);
+        const context = fitCanvasBase(containerSize, d);
+        const point = d.__saliency || saliencyPoint(d.__img);
+        const focus = [
+            Math.max(0, Math.min(1, point[0])),
+            Math.max(0, Math.min(1, point[1]))
+        ];
+        const contain = fitSourceScale(containerSize, d.__img);
+        const cover = coverScale(containerSize, d.__img);
+        const scale = contain + (cover - contain) * n;
+        const sw = d.__img.naturalWidth * scale;
+        const sh = d.__img.naturalHeight * scale;
+        const maxX = Math.max(0, sw - containerSize[0]);
+        const maxY = Math.max(0, sh - containerSize[1]);
+        context.drawImage(d.__img, -maxX * focus[0], -maxY * focus[1], sw, sh);
+        return d.__canvas;
+    }
+
+    function drawMappedImage(containerSize, d, mapper, value) {
+        const context = fitCanvasBase(containerSize, d);
+        const image = d.__img;
+        const w = containerSize[0], h = containerSize[1];
+        const source = createCanvas(image.naturalWidth, image.naturalHeight);
+        const sourceCtx = source.getContext("2d");
+        sourceCtx.drawImage(image, 0, 0);
+        const src = sourceCtx.getImageData(0, 0, source.width, source.height);
+        const out = context.createImageData(w, h);
+        const sw = source.width, sh = source.height;
+        for (let y = 0; y < h; ++y) {
+            for (let x = 0; x < w; ++x) {
+                const uv = mapper(x / Math.max(1, w - 1), y / Math.max(1, h - 1), value);
+                const sx = Math.max(0, Math.min(sw - 1, uv[0] * (sw - 1)));
+                const sy = Math.max(0, Math.min(sh - 1, uv[1] * (sh - 1)));
+                const x0 = Math.floor(sx), y0 = Math.floor(sy);
+                const x1 = Math.min(sw - 1, x0 + 1), y1 = Math.min(sh - 1, y0 + 1);
+                const tx = sx - x0, ty = sy - y0;
+                const oi = (y * w + x) * 4;
+                for (let c = 0; c < 4; ++c) {
+                    const a = src[(y0 * sw + x0) * 4 + c];
+                    const b = src[(y0 * sw + x1) * 4 + c];
+                    const c0 = src[(y1 * sw + x0) * 4 + c];
+                    const e = src[(y1 * sw + x1) * 4 + c];
+                    out.data[oi + c] = a * (1 - tx) * (1 - ty) + b * tx * (1 - ty) + c0 * (1 - tx) * ty + e * tx * ty;
+                }
+            }
+        }
+        context.putImageData(out, 0, 0);
+        // putImageData ignores the current clipping region, so re-apply a stored
+        // shape mask after pixel mapping.
+        if (d.__clipath) {
+            context.save();
+            context.globalCompositeOperation = "destination-in";
+            context.fill(d.__clipath);
+            context.restore();
+        }
+        return d.__canvas;
+    }
+
+    function fit_warp(containerSize, d, value = 1) {
+        const n = normalizedValue(value);
+        return drawMappedImage(containerSize, d, (u, v, amount) => {
+            const dx = u - 0.5, dy = v - 0.5;
+            const r2 = dx * dx + dy * dy;
+            const k = 1 + amount * 2.5 * r2;
+            return [0.5 + dx * k, 0.5 + dy * k];
+        }, n);
+    }
+
+    function fit_mesh(containerSize, d, value = 1) {
+        const n = normalizedValue(value);
+        return drawMappedImage(containerSize, d, (u, v, amount) => {
+            const x = u + amount * 0.12 * Math.sin(Math.PI * v) * Math.sin(2 * Math.PI * u);
+            const y = v + amount * 0.12 * Math.sin(Math.PI * u) * Math.sin(2 * Math.PI * v);
+            return [x, y];
+        }, n);
+    }
+
+    function fit_squeeze(containerSize, d, value = 1) {
+        const n = normalizedValue(value);
+        return drawMappedImage(containerSize, d, (u, v, amount) => {
+            const k = 1 - 0.75 * amount;
+            return [0.5 + (u - 0.5) * k, v];
+        }, n);
+    }
+
+    function fit_bend(containerSize, d, value = 1) {
+        const n = normalizedValue(value);
+        return drawMappedImage(containerSize, d, (u, v, amount) => {
+            const angle = (u - 0.5) * Math.PI * amount;
+            const radius = 0.5 / Math.max(0.15, amount || 1);
+            if (amount < 1e-6) return [u, v];
+            return [
+                0.5 + Math.sin(angle) * radius,
+                v + (1 - Math.cos(angle)) * radius * (v - 0.5) * 0.5
+            ];
+        }, n);
+    }
+
+    function fit_cylinder(containerSize, d, value = 1) {
+        const n = normalizedValue(value);
+        return drawMappedImage(containerSize, d, (u, v, amount) => {
+            if (amount < 1e-6) return [u, v];
+            const theta = (u - 0.5) * Math.PI * amount;
+            const x = 0.5 + Math.sin(theta) / Math.max(1e-6, Math.sin(Math.PI * amount / 2));
+            return [Math.max(0, Math.min(1, x)), v];
+        }, n);
+    }
+
+    function fit_sphere(containerSize, d, value = 1) {
+        const n = normalizedValue(value);
+        return drawMappedImage(containerSize, d, (u, v, amount) => {
+            if (amount < 1e-6) return [u, v];
+            const x = u - 0.5;
+            const y = v - 0.5;
+            const r2 = x * x + y * y;
+            const factor = 1 + amount * 1.5 * Math.max(0, 0.25 - r2);
+            return [0.5 + x * factor, 0.5 + y * factor];
+        }, n);
+    }
+
+    function normalizedValue(value) {
+        if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+        return Math.max(0, Math.min(1, value));
+    }
+
+    function shapePath(containerSize, d) {
+        const spec = d.__shape || {type: "rect"};
+        const type = spec.type || "rect";
+        const option = spec.option;
+        const [w, h] = containerSize;
+
+        if (type === "rect") return undefined;
+
+        if (type === "circle") {
+            const r = option === undefined
+                ? Math.min(w, h) / 2
+                : Number(option);
+            const path = new Path2D();
+            path.arc(
+                w / 2,
+                h / 2,
+                Number.isFinite(r) ? r : Math.min(w, h) / 2,
+                0,
+                2 * Math.PI
+            );
+            return path;
+        }
+
+        if (type === "path") {
+            let points = option;
+
+            if (Array.isArray(points) && points.length > 2) {
+                const normalized = points.every(p =>
+                    Array.isArray(p) &&
+                    p.length >= 2 &&
+                    Number.isFinite(Number(p[0])) &&
+                    Number.isFinite(Number(p[1])) &&
+                    Number(p[0]) >= 0 && Number(p[0]) <= 1 &&
+                    Number(p[1]) >= 0 && Number(p[1]) <= 1
+                );
+
+                points = normalized
+                    ? points.map(([x, y]) => [Number(x) * w, Number(y) * h])
+                    : points;
+
+                return pathFromPoints(points);
+            }
+
+            if (typeof points === "string") return new Path2D(points);
+            return undefined;
+        }
+
+        if (type === "triangle") return pathFromPoints(regularPolygonPoints([w, h], 3));
+        if (type === "diamond") return pathFromPoints(regularPolygonPoints([w, h], 4));
+        if (type === "pentagon") return pathFromPoints(regularPolygonPoints([w, h], 5));
+        if (type === "hexagon") return pathFromPoints(regularPolygonPoints([w, h], 6));
+        if (type === "octagon") return pathFromPoints(regularPolygonPoints([w, h], 8));
+
+        if (type === "star") {
+            const points = typeof option === "number"
+                ? option
+                : option?.points ?? 5;
+            const innerRatio = typeof option === "object"
+                ? option.innerRatio ?? 0.5
+                : 0.5;
+
+            const cx = w / 2;
+            const cy = h / 2;
+            const outerR = Math.min(w, h) / 2;
+            const innerR = outerR * innerRatio;
+            const step = Math.PI / points;
+            const vertices = [];
+
+            for (let i = 0; i < points * 2; i++) {
+                const r = i % 2 === 0 ? outerR : innerR;
+                const angle = -Math.PI / 2 + i * step;
+                vertices.push([
+                    cx + r * Math.cos(angle),
+                    cy + r * Math.sin(angle)
+                ]);
+            }
+
+            return pathFromPoints(vertices);
+        }
+
+        if (type === "cross") {
+            const thicknessRatio = Number.isFinite(Number(option))
+                ? Number(option)
+                : 1 / 3;
+
+            const t = Math.min(w, h) * thicknessRatio;
+            const x0 = (w - t) / 2;
+            const x1 = (w + t) / 2;
+            const y0 = (h - t) / 2;
+            const y1 = (h + t) / 2;
+
+            return pathFromPoints([
+                [x0, 0], [x1, 0], [x1, y0], [w, y0],
+                [w, y1], [x1, y1], [x1, h], [x0, h],
+                [x0, y1], [0, y1], [0, y0], [x0, y0]
+            ]);
+        }
+
+        if (type === "roundedRect") {
+            const r = Math.min(
+                Number(option ?? Math.min(w, h) * 0.15),
+                Math.min(w, h) / 2
+            );
+
+            const path = new Path2D();
+            path.moveTo(r, 0);
+            path.lineTo(w - r, 0);
+            path.arcTo(w, 0, w, r, r);
+            path.lineTo(w, h - r);
+            path.arcTo(w, h, w - r, h, r);
+            path.lineTo(r, h);
+            path.arcTo(0, h, 0, h - r, r);
+            path.lineTo(0, r);
+            path.arcTo(0, 0, r, 0, r);
+            path.closePath();
+            return path;
+        }
+
+        return undefined;
+    }
+
+    function applyShapeMask(canvas, d) {
+        const context = canvas.getContext("2d");
+        const path = shapePath([canvas.width, canvas.height], d);
+        d.__clipath = path;
+        if (!path) return canvas;
+
+        const masked = createCanvas(canvas.width, canvas.height);
+        const maskedContext = masked.getContext("2d");
+        maskedContext.drawImage(canvas, 0, 0);
+        maskedContext.save();
+        maskedContext.globalCompositeOperation = "destination-in";
+        maskedContext.fill(path);
+        maskedContext.restore();
+
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(masked, 0, 0);
+        return canvas;
+    }
+
+
+    function resizeCanvasPreservingContent(d, width, height) {
+        const canvas = d.__canvas;
+        const w = Math.max(1, Math.round(width));
+        const h = Math.max(1, Math.round(height));
+
+        if (canvas.width === w && canvas.height === h) return canvas;
+
+        const current = createCanvas(
+            Math.max(1, canvas.width || w),
+            Math.max(1, canvas.height || h)
+        );
+
+        if (canvas.width && canvas.height) {
+            current.getContext("2d").drawImage(canvas, 0, 0);
+        }
+
+        canvas.width = w;
+        canvas.height = h;
+
+        const context = canvas.getContext("2d");
+        context.clearRect(0, 0, w, h);
+
+        if (current.width && current.height) {
+            context.drawImage(
+                current,
+                0, 0, current.width, current.height,
+                0, 0, w, h
+            );
+        }
+
+        return canvas;
+    }
+
+    function renderShape(containerSize, d) {
+        resizeCanvasPreservingContent(d, containerSize[0], containerSize[1]);
+        return applyShapeMask(d.__canvas, d);
+    }
 
     function shape(elements, type = "rect", option, callback) {
         const elems = toElements(elements);
-        for (const element of elems) {
+
+        for (let i = 0; i < elems.length; ++i) {
+            const element = elems[i];
             let d = datumFor(element);
-            if (typeof callback === "function") d = callback(d);
+
+            if (typeof callback === "function") {
+                d = callback(d, i, elems);
+            }
+
+            if (!d || !d.__img || !d.__canvas) {
+                throw new Error("shape() requires data initialized with initPixScale()");
+            }
 
             const width = element.getAttribute("width");
             const height = element.getAttribute("height");
@@ -884,73 +1657,37 @@
             element.setAttribute("width", w);
             element.setAttribute("height", h);
 
-            d.__canvas.width = w;
-            d.__canvas.height = h;
+            d.__shape = {type, option};
+            renderShape([w, h], d);
 
-            const strategy = shapes[type];
-            if (!strategy) throw new Error(`Unknown shape: ${type}`);
-            strategy.function([w, h], d, option);
             setImageHref(element, d.__canvas.toDataURL(IMAGE_MIME));
         }
+
         return elements;
     }
 
-    function shape_rect(containerSize, d) {
-        const context = d.__canvas.getContext("2d");
-        context.clearRect(0, 0, ...containerSize);
-        d.__clipath = undefined;
-        context.drawImage(d.__img, 0, 0, containerSize[0], containerSize[1]);
+    function pathFromPoints(points, close = true) {
+        const clipPath = new Path2D();
+        clipPath.moveTo(...points[0]);
+        for (let i = 1; i < points.length; ++i) clipPath.lineTo(...points[i]);
+        if (close) clipPath.closePath();
+        return clipPath;
     }
 
-    function shape_circle(containerSize, d, r) {
-        if (r === undefined) r = Math.min(...containerSize) / 2;
-
-        const context = d.__canvas.getContext("2d");
-        const circlePath = new Path2D();
-        circlePath.arc(
-            containerSize[0] / 2,
-            containerSize[1] / 2,
-            r,
-            0,
-            2 * Math.PI
-        );
-        context.clip(circlePath);
-        d.__clipath = circlePath;
-        context.drawImage(d.__img, 0, 0, containerSize[0], containerSize[1]);
-    }
-
-    function shape_path(containerSize, d, path) {
-        let clipPath;
-
-        if (Array.isArray(path) && path.length > 3) {
-            if (
-                Math.max(...path.map(p => p[0])) <= 1 &&
-                Math.max(...path.map(p => p[1])) <= 1
-            ) {
-                path = path.map(p => p.map((v, i) => v * containerSize[i]));
-            }
-
-            clipPath = new Path2D();
-            clipPath.moveTo(...path[0]);
-            for (let i = 1; i < path.length; ++i) clipPath.lineTo(...path[i]);
-        } else if (typeof path === "string") {
-            clipPath = new Path2D(path);
-        } else {
-            clipPath = new Path2D();
+    function regularPolygonPoints(containerSize, sides, rotation = -Math.PI / 2) {
+        const [w, h] = containerSize;
+        const cx = w / 2;
+        const cy = h / 2;
+        const r = Math.min(w, h) / 2;
+        const points = [];
+        for (let i = 0; i < sides; i++) {
+            const angle = rotation + (i * 2 * Math.PI) / sides;
+            points.push([cx + r * Math.cos(angle), cy + r * Math.sin(angle)]);
         }
-
-        const context = d.__canvas.getContext("2d");
-        context.clip(clipPath);
-        d.__clipath = clipPath;
-        context.drawImage(d.__img, 0, 0, containerSize[0], containerSize[1]);
+        return points;
     }
 
-    const shapes = {
-        rect: {function: shape_rect},
-        circle: {function: shape_circle},
-        path: {function: shape_path}
-    };
-
+    //somehow this trick is needed to get nodes in selections
     function asSelectionMethod(fn) {
         return function (...args) {
             fn(this.nodes(), ...args);
@@ -960,34 +1697,30 @@
 
 
     async function initPixScale(data, images, callback) {
-        // Extend d3.selection with the toolkit's custom methods.
         d3__namespace.selection.prototype.transform = asSelectionMethod(transform);
         d3__namespace.selection.prototype.fit = asSelectionMethod(fit);
         d3__namespace.selection.prototype.shape = asSelectionMethod(shape);
 
         if (data === undefined) return data;
 
-        if (Array.isArray(images)) {
-            for (let i = 0; i < data.length; ++i) {
-                // TODO: still only handles b64 strings vs. already-loaded HTMLImageElements
-                if (typeof images[0] === "string") {
-                    data[i].__src = images[i];
-                    data[i].__img = (await loadImage(data[i].__src));
-                } else {
-                    data[i].__img = images[i];
-                }
+        const usesArray = Array.isArray(images);
+        const usesUrls = usesArray && typeof images[0] === "string";
 
-                data[i].__canvas = createCanvas(data[i].__img.naturalWidth, data[i].__img.naturalHeight);
-                data[i].__canvas.getContext("2d").drawImage(data[i].__img, 0, 0);
+
+        await Promise.all(data.map(async (datum, i) => {
+            if (usesArray) {
+                // TODO: still only handles b64/URL strings vs. already-loaded
+                // HTMLImageElements — same as the original notebook cell.
+                if (usesUrls) {
+                    datum.__src = images[i];
+                    return attachImage(datum, await loadImage(datum.__src));
+                }
+                return attachImage(datum, images[i]);
             }
-        } else {
-            for (let i = 0; i < data.length; ++i) {
-                data[i].__src = images([data[i]].map(callback)[0]);
-                data[i].__img = (await loadImage(data[i].__src));
-                data[i].__canvas = createCanvas(data[i].__img.naturalWidth, data[i].__img.naturalHeight);
-                data[i].__canvas.getContext("2d").drawImage(data[i].__img, 0, 0);
-            }
-        }
+
+            datum.__src = images([datum].map(callback)[0]);
+            return attachImage(datum, await loadImage(datum.__src));
+        }));
 
         return data;
     }
