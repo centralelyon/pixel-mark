@@ -84,4 +84,13 @@ See the documentation for strategies available of each:
 The *transform()* function is chainable! Meaning you can combine multiple transforms on a single image!
 
 
+## Credits
 
+ANR Grant [Project-ANR-21-CE33-0002](https://anr.fr/Project-ANR-21-CE33-0002)
+
+<p align="center">
+  <a href="https://www.ec-lyon.fr"><img src="figures/logo-ecl.png" alt="ECL" width="22%"/></a>
+  <a href="https://anr.fr/"><img src="figures/logo-anr.png" alt="ANR" width="22%"/></a>
+  <a href="https://www.inria.fr"><img src="figures/logo-inria.png" alt="Inria" width="22%"/></a>
+  <a href="https://liris.cnrs.fr"><img src="figures/logo-liris.png" alt="LIRIS" width="22%"/></a>
+</p>
