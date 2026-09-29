@@ -28,7 +28,7 @@ const {
     transform
 } = pixel_mark;
 
-  const dataset = iniPixScale(data,images)
+  const dataset = initPixScale(data,images)
 ```
 
 

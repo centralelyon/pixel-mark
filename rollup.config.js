@@ -6,11 +6,11 @@ export default {
   external: ["d3"],
   output: [
     {
-      file: "dist/pixel_mark.esm.js",
+      file: "dist/pixel-mark.esm.js",
       format: "es"
     },
     {
-      file: "dist/pixel_mark.umd.js",
+      file: "dist/pixel-mark.umd.cjs",
       format: "umd",
       name: "pixel_mark",
       globals: { d3: "d3" }

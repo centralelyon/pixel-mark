@@ -1,11 +1,17 @@
 {
-  "name": "pixel_mark",
+  "name": "pixel-mark",
   "version": "0.1.0",
   "description": "Standalone build of the pixel-mark d3-toolkit (extracted from the @liris/pixel-mark-d3-toolkit Observable notebook).",
   "type": "module",
-  "main": "dist/pixel_mark.umd.js",
-  "module": "dist/pixel_mark.esm.js",
-  "unpkg": "dist/pixel_mark.umd.js",
+  "main": "dist/pixel-mark.umd.js",
+  "module": "dist/pixel-mark.esm.js",
+  "exports": {
+    ".": {
+      "import": "./dist/pixel_mark.esm.js",
+      "require": "./dist/pixel_mark.umd.js"
+    }
+  },
+  "unpkg": "dist/pixel-mark.umd.js",
   "files": [
     "dist",
     "src"
@@ -19,5 +25,25 @@
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^15.2.3",
     "rollup": "^4.24.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/centralelyon/pixel-mark.git"
+  },
+  "homepage": "https://centralelyon.github.io/pixel-mark/",
+  "bugs": "https://github.com/centralelyon/pixel-mark/issues",
+  "keywords": [
+    "d3",
+    "d3-visualization",
+    "data-visualization",
+    "image",
+    "raster",
+    "pixel-mark"
+  ],
+  "license": "MIT",
+  "author": "Your name or org",
+  "scripts": {
+    "build": "rollup -c",
+    "prepublishOnly": "npm run build"
   }
 }
