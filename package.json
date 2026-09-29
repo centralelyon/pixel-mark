@@ -1,6 +1,6 @@
 {
   "name": "pixel-mark",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Standalone build of the pixel-mark d3-toolkit (extracted from the @liris/pixel-mark-d3-toolkit Observable notebook).",
   "type": "module",
   "main": "dist/pixel-mark.umd.js",
