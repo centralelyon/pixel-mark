@@ -1,10 +1,10 @@
 import * as d3 from "d3";
-import {transform} from "./transform.js";
-import {fit} from "./fit.js";
-import {shape} from "./shape.js";
+import {transform, transforms} from "./transform.js";
+import {fit, fits} from "./fit.js";
+import {shape, shapes} from "./shape.js";
 import {attachImage, loadImage} from "./utils.js";
 
-export {transform, fit, shape};
+export {transform, fit, shape,transforms, fits, shapes};
 
 
 //somehow this trick is needed to get nodes in selections

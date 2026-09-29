@@ -1687,6 +1687,72 @@
         return points;
     }
 
+
+
+
+    function shapeFunction(containerSize, d, type, option) {
+        d.__shape = { type, option };
+        renderShape(containerSize, d);
+        return d.__canvas;
+    }
+
+    function shape_rect(containerSize, d) {
+        return shapeFunction(containerSize, d, "rect");
+    }
+
+    function shape_circle(containerSize, d, r) {
+        return shapeFunction(containerSize, d, "circle", r);
+    }
+
+    function shape_path(containerSize, d, path) {
+        return shapeFunction(containerSize, d, "path", path);
+    }
+
+    function regularPolygonShape(sides) {
+        return function (containerSize, d, rotation = -Math.PI / 2) {
+            d.__shape = {
+                type: "path",
+                option: regularPolygonPoints(containerSize, sides, rotation)
+            };
+            return renderShape(containerSize, d);
+        };
+    }
+
+    const shape_triangle = regularPolygonShape(3);
+    const shape_diamond = regularPolygonShape(4);
+    const shape_pentagon = regularPolygonShape(5);
+    const shape_hexagon = regularPolygonShape(6);
+    const shape_octagon = regularPolygonShape(8);
+
+    function shape_star(containerSize, d, option) {
+        d.__shape = { type: "star", option };
+        return renderShape(containerSize, d);
+    }
+
+    function shape_cross(containerSize, d, thicknessRatio = 1 / 3) {
+        d.__shape = { type: "cross", option: thicknessRatio };
+        return renderShape(containerSize, d);
+    }
+
+    function shape_roundedRect(containerSize, d, radius) {
+        d.__shape = { type: "roundedRect", option: radius };
+        return renderShape(containerSize, d);
+    }
+
+    const shapes = {
+        rect: {function: shape_rect},
+        circle: {function: shape_circle},
+        path: {function: shape_path},
+        triangle: {function: shape_triangle},
+        diamond: {function: shape_diamond},
+        pentagon: {function: shape_pentagon},
+        hexagon: {function: shape_hexagon},
+        octagon: {function: shape_octagon},
+        star: {function: shape_star},
+        cross: {function: shape_cross},
+        roundedRect: {function: shape_roundedRect}
+    };
+
     //somehow this trick is needed to get nodes in selections
     function asSelectionMethod(fn) {
         return function (...args) {
@@ -1726,8 +1792,11 @@
     }
 
     exports.fit = fit;
+    exports.fits = fits;
     exports.initPixScale = initPixScale;
     exports.shape = shape;
+    exports.shapes = shapes;
     exports.transform = transform;
+    exports.transforms = transforms;
 
 }));
