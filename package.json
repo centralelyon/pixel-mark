@@ -1,6 +1,6 @@
 {
   "name": "pixel-mark",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Standalone build of the pixel-mark d3-toolkit (extracted from the @liris/pixel-mark-d3-toolkit Observable notebook).",
   "type": "module",
   "main": "dist/pixel-mark.umd.js",
@@ -17,7 +17,8 @@
     "src"
   ],
   "scripts": {
-    "build": "rollup -c"
+    "build": "rollup -c",
+    "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
     "d3": "^7.9.0"
@@ -41,9 +42,5 @@
     "pixel-mark"
   ],
   "license": "MIT",
-  "author": "Your name or org",
-  "scripts": {
-    "build": "rollup -c",
-    "prepublishOnly": "npm run build"
-  }
+  "author": "Your name or org"
 }
