@@ -7,7 +7,7 @@ At its core, this toolkit is divided in 3 functions:
 
 * **SHAPE** To select the images' shape (e.g. hexagon,circle, or star..).
 * **FIT** To decide how such shape should be filled (e.g. center, stretch, focus, or crop..)
-* **TRANSFORM* To provide pixel-wise transformations on images to encode data. (e.g. color filter)
+* **TRANSFORM** To provide pixel-wise transformations on images to encode data. (e.g. color filter, halftone, or hexbin..)
 
 You can experiment, and explore different strategies of these functions on this sandbox:
 https://centralelyon.github.io/pixel-mark/liveEdit/
